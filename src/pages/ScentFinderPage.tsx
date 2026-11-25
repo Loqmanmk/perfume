@@ -3,9 +3,9 @@ import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { Button } from '@/components/ui/Button';
+import { useCatalogue } from '@/features/catalogue/useCatalogue';
 import { QUESTIONS, recommend, type QuizAnswers } from '@/features/scent-finder/quiz';
 import { usePageTitle } from '@/lib/hooks/usePageTitle';
-import { productRepository } from '@/services/productRepository';
 
 const RESULT_COUNT = 3;
 
@@ -19,6 +19,7 @@ const stepMotion = {
 export function ScentFinderPage() {
   usePageTitle('Scent Finder');
 
+  const { repository } = useCatalogue();
   const [answers, setAnswers] = useState<QuizAnswers>({});
   const [stepIndex, setStepIndex] = useState(0);
 
@@ -65,7 +66,7 @@ export function ScentFinderPage() {
                 before you commit.
               </p>
               <div className="mt-14 [&>ul]:lg:grid-cols-3">
-                <ProductGrid products={recommend(productRepository.getAll(), answers, RESULT_COUNT)} />
+                <ProductGrid products={recommend(repository.getAll(), answers, RESULT_COUNT)} />
               </div>
               <div className="mt-14 text-center">
                 <Button variant="outline" onClick={restart}>

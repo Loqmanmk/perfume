@@ -34,7 +34,8 @@ export function BottleViewer(props: BottleCanvasProps) {
   );
 
   return (
-    <WebGLBoundary fallback={fallback}>
+    // Keyed so a broken model does not keep the viewer stuck after it is replaced.
+    <WebGLBoundary key={props.modelUrl ?? 'generated'} fallback={fallback}>
       <Suspense fallback={fallback}>
         <BottleCanvas {...props} />
       </Suspense>

@@ -1,10 +1,8 @@
-import { PRODUCTS } from '@/data/products';
 import type { Product } from '@/domain/product';
 
 /**
- * Abstraction over the catalogue. UI code depends on this interface, never on
- * the data source, so the in-memory list can be swapped for an API or CMS
- * without touching a single component.
+ * Read-only queries over the catalogue. UI code depends on this interface, not
+ * on where the products come from.
  */
 export interface ProductRepository {
   getAll(): readonly Product[];
@@ -15,10 +13,12 @@ export interface ProductRepository {
 }
 
 export class InMemoryProductRepository implements ProductRepository {
+  private readonly products: readonly Product[];
   private readonly byId: ReadonlyMap<string, Product>;
   private readonly bySlug: ReadonlyMap<string, Product>;
 
-  constructor(private readonly products: readonly Product[]) {
+  constructor(products: readonly Product[]) {
+    this.products = products;
     this.byId = new Map(products.map((product) => [product.id, product]));
     this.bySlug = new Map(products.map((product) => [product.slug, product]));
   }
@@ -50,5 +50,3 @@ export class InMemoryProductRepository implements ProductRepository {
       .slice(0, limit);
   }
 }
-
-export const productRepository: ProductRepository = new InMemoryProductRepository(PRODUCTS);

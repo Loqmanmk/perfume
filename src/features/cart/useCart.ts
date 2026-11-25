@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
-import { SITE } from '@/config/site';
+import { calculateTotals, type Totals } from '@/domain/pricing';
 import { findSize, type Product } from '@/domain/product';
-import { productRepository } from '@/services/productRepository';
+import { useCatalogue } from '@/features/catalogue/useCatalogue';
+import type { ProductRepository } from '@/services/productRepository';
 import { useCartStore, type CartLine } from '@/store/cartStore';
 
 export interface CartItem {
@@ -13,18 +14,13 @@ export interface CartItem {
   lineTotal: number;
 }
 
-export interface CartSummary {
+export interface CartSummary extends Totals {
   items: CartItem[];
   itemCount: number;
-  subtotal: number;
-  shipping: number;
-  total: number;
-  /** Amount still missing to unlock free shipping (0 once unlocked). */
-  remainingForFreeShipping: number;
 }
 
-function toCartItem(line: CartLine): CartItem | undefined {
-  const product = productRepository.getById(line.productId);
+function toCartItem(line: CartLine, catalogue: ProductRepository): CartItem | undefined {
+  const product = catalogue.getById(line.productId);
   const size = product && findSize(product, line.sizeMl);
   if (!product || !size) return undefined;
 
@@ -38,25 +34,21 @@ function toCartItem(line: CartLine): CartItem | undefined {
   };
 }
 
-export function summariseCart(lines: readonly CartLine[]): CartSummary {
-  const items = lines.map(toCartItem).filter((item) => item !== undefined);
+/** Joins cart lines with live catalogue data. Lines for removed products are dropped. */
+export function summariseCart(lines: readonly CartLine[], catalogue: ProductRepository): CartSummary {
+  const items = lines.map((line) => toCartItem(line, catalogue)).filter((item) => item !== undefined);
   const subtotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-  const qualifiesForFreeShipping = subtotal >= SITE.freeShippingThreshold;
-  const shipping = items.length === 0 || qualifiesForFreeShipping ? 0 : SITE.shippingFee;
 
   return {
+    ...calculateTotals(subtotal),
     items,
-    itemCount,
-    subtotal,
-    shipping,
-    total: subtotal + shipping,
-    remainingForFreeShipping: Math.max(SITE.freeShippingThreshold - subtotal, 0),
+    itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
   };
 }
 
 /** Cart lines joined with live catalogue data and totals. */
 export function useCart(): CartSummary {
   const lines = useCartStore((state) => state.lines);
-  return useMemo(() => summariseCart(lines), [lines]);
+  const { repository } = useCatalogue();
+  return useMemo(() => summariseCart(lines, repository), [lines, repository]);
 }

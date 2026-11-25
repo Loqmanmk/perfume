@@ -2,16 +2,18 @@ import { Heart } from 'lucide-react';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { ButtonLink } from '@/components/ui/Button';
 import { SectionHeading } from '@/components/ui/SectionHeading';
+import { ProductGridSkeleton } from '@/components/ui/Skeleton';
+import { useCatalogue } from '@/features/catalogue/useCatalogue';
 import { usePageTitle } from '@/lib/hooks/usePageTitle';
-import { productRepository } from '@/services/productRepository';
 import { useWishlistStore } from '@/store/wishlistStore';
 
 export function WishlistPage() {
   usePageTitle('Wishlist');
 
   const productIds = useWishlistStore((state) => state.productIds);
+  const { repository, isLoading } = useCatalogue();
   const products = productIds
-    .map((id) => productRepository.getById(id))
+    .map((id) => repository.getById(id))
     .filter((product) => product !== undefined);
 
   return (
@@ -23,7 +25,11 @@ export function WishlistPage() {
         description="The fragrances you are still thinking about."
       />
 
-      {products.length > 0 ? (
+      {isLoading ? (
+        <div className="mt-14">
+          <ProductGridSkeleton />
+        </div>
+      ) : products.length > 0 ? (
         <div className="mt-14">
           <ProductGrid products={products} />
         </div>

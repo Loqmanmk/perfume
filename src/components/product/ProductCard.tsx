@@ -1,10 +1,11 @@
-import { Plus } from 'lucide-react';
+import { Plus, Rotate3d } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { defaultSize, FAMILY_LABELS, startingPrice, type Product } from '@/domain/product';
+import { coverImage, defaultSize, FAMILY_LABELS, startingPrice, type Product } from '@/domain/product';
+import { cn } from '@/lib/cn';
 import { formatPrice } from '@/lib/format';
 import { useCartStore } from '@/store/cartStore';
 import { useUiStore } from '@/store/uiStore';
-import { BottleArt } from './BottleArt';
+import { ProductThumbnail } from './ProductThumbnail';
 import { WishlistButton } from './WishlistButton';
 
 function badgeFor(product: Product): string | undefined {
@@ -18,6 +19,7 @@ export function ProductCard({ product }: { product: Product }) {
   const openCart = useUiStore((state) => state.openCart);
   const badge = badgeFor(product);
   const quickAddSize = defaultSize(product);
+  const hasPhoto = coverImage(product) !== undefined;
 
   const handleQuickAdd = () => {
     addToCart({ productId: product.id, sizeMl: quickAddSize.ml, quantity: 1 });
@@ -38,21 +40,25 @@ export function ProductCard({ product }: { product: Product }) {
 
         <Link
           to={`/product/${product.slug}`}
-          className="relative block aspect-[4/5] p-8"
+          className={cn('relative block aspect-[4/5]', !hasPhoto && 'p-8')}
           aria-label={`${product.name}, ${FAMILY_LABELS[product.family]}, from ${formatPrice(startingPrice(product))}`}
         >
-          <BottleArt
-            bottle={product.bottle}
-            name={product.name}
-            className="mx-auto h-full transition-transform duration-700 ease-luxe group-hover:-translate-y-2 group-hover:scale-105"
+          <ProductThumbnail
+            product={product}
+            withName
+            className="transition-transform duration-700 ease-luxe group-hover:scale-105"
           />
         </Link>
 
         {badge && (
-          <span className="absolute left-4 top-4 rounded-full border border-gold/40 px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-gold">
+          <span className="absolute left-4 top-4 rounded-full border border-gold/40 bg-ink-950/40 px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.2em] text-gold backdrop-blur">
             {badge}
           </span>
         )}
+
+        <span className="pointer-events-none absolute bottom-4 left-4 flex items-center gap-1.5 rounded-full bg-ink-950/50 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-cream/80 backdrop-blur">
+          <Rotate3d size={12} aria-hidden /> 360°
+        </span>
 
         <WishlistButton product={product} className="absolute right-2 top-2" />
 

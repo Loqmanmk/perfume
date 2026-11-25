@@ -1,20 +1,22 @@
-import { useState, type FormEvent } from 'react';
-import { CircleCheck, Info, Lock } from 'lucide-react';
-import { BottleArt } from '@/components/product/BottleArt';
+import { useState, type ReactNode } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { CircleCheck, Info, Lock, UserRound } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { ProductThumbnail } from '@/components/product/ProductThumbnail';
 import { Button, ButtonLink } from '@/components/ui/Button';
-import {
-  CHECKOUT_FIELDS,
-  createOrderNumber,
-  EMPTY_CHECKOUT_VALUES,
-  validateCheckout,
-  type CheckoutErrors,
-  type CheckoutFieldName,
-  type CheckoutValues,
-} from '@/features/checkout/checkoutForm';
+import { Field, FormAlert, inputClass } from '@/components/ui/form/Field';
+import { shippingAddressSchema, type Order, type ShippingAddress } from '@/domain/order';
+import type { PublicUser } from '@/domain/user';
+import { PageLoader } from '@/features/auth/RequireAuth';
+import { useSession } from '@/features/auth/useSession';
 import { useCart, type CartSummary } from '@/features/cart/useCart';
+import { CHECKOUT_FIELDS, initialShipping } from '@/features/checkout/checkoutForm';
 import { cn } from '@/lib/cn';
 import { formatPrice } from '@/lib/format';
+import { applyServerErrors } from '@/lib/forms';
 import { usePageTitle } from '@/lib/hooks/usePageTitle';
+import { orderApi } from '@/services/orderApi';
 import { useCartStore } from '@/store/cartStore';
 
 function OrderSummary({ cart }: { cart: CartSummary }) {
@@ -30,8 +32,8 @@ function OrderSummary({ cart }: { cart: CartSummary }) {
       <ul className="hairline mt-6 divide-y divide-cream/10 border-y">
         {cart.items.map((item) => (
           <li key={item.key} className="flex items-center gap-4 py-4">
-            <div className="grid h-20 w-16 shrink-0 place-items-center rounded-lg bg-ink-800">
-              <BottleArt bottle={item.product.bottle} name="" className="h-16" />
+            <div className="grid h-20 w-16 shrink-0 place-items-center overflow-hidden rounded-lg bg-ink-800 p-1">
+              <ProductThumbnail product={item.product} className="rounded-md" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate font-display text-xl">{item.product.name}</p>
@@ -62,36 +64,131 @@ function OrderSummary({ cart }: { cart: CartSummary }) {
   );
 }
 
-function Confirmation({ orderNumber, email }: { orderNumber: string; email: string }) {
+function CenteredMessage({ children }: { children: ReactNode }) {
+  return <div className="container-page grid min-h-[85dvh] place-items-center pt-18 text-center">{children}</div>;
+}
+
+function Confirmation({ order }: { order: Order }) {
   return (
-    <div className="container-page grid min-h-[85dvh] place-items-center pt-18 text-center">
+    <CenteredMessage>
       <div role="status">
         <CircleCheck size={44} strokeWidth={1.2} className="mx-auto text-gold" aria-hidden />
-        <p className="eyebrow mt-6">Order {orderNumber}</p>
+        <p className="eyebrow mt-6">Order {order.number}</p>
         <h1 className="mt-4 text-5xl md:text-7xl">Thank you.</h1>
         <p className="mx-auto mt-5 max-w-md text-muted">
-          Your order is confirmed. A receipt is on its way to{' '}
-          <span className="text-cream">{email}</span>.
+          Your order is confirmed. You can follow it from your account; a receipt goes to{' '}
+          <span className="text-cream">{order.shipping.email}</span>.
         </p>
-        <ButtonLink to="/shop" size="lg" className="mt-9">
-          Continue shopping
-        </ButtonLink>
+        <div className="mt-9 flex flex-wrap justify-center gap-3">
+          <ButtonLink to="/account" size="lg">
+            View my orders
+          </ButtonLink>
+          <ButtonLink to="/shop" size="lg" variant="outline">
+            Continue shopping
+          </ButtonLink>
+        </div>
       </div>
-    </div>
+    </CenteredMessage>
   );
 }
 
-function EmptyCheckout() {
+function SignInToCheckout() {
+  const redirect = encodeURIComponent('/checkout');
   return (
-    <div className="container-page grid min-h-[85dvh] place-items-center pt-18 text-center">
-      <div>
-        <h1 className="text-5xl md:text-6xl">Your bag is empty</h1>
-        <p className="mt-4 text-muted">Add a fragrance before checking out.</p>
-        <ButtonLink to="/shop" size="lg" className="mt-8">
-          Explore the collection
-        </ButtonLink>
+    <CenteredMessage>
+      <div className="max-w-md">
+        <UserRound size={40} strokeWidth={1.2} className="mx-auto text-gold" aria-hidden />
+        <h1 className="mt-5 text-5xl md:text-6xl">Sign in to check out</h1>
+        <p className="mt-4 text-muted">
+          Your bag is saved. An account lets you follow your order and find it again later.
+        </p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <ButtonLink to={`/login?redirect=${redirect}`} size="lg">
+            Sign in
+          </ButtonLink>
+          <ButtonLink to={`/register?redirect=${redirect}`} size="lg" variant="outline">
+            Create an account
+          </ButtonLink>
+        </div>
       </div>
-    </div>
+    </CenteredMessage>
+  );
+}
+
+function DeliveryForm({ user, cart, onPlaced }: { user: PublicUser; cart: CartSummary; onPlaced: (order: Order) => void }) {
+  const queryClient = useQueryClient();
+  const lines = useCartStore((state) => state.lines);
+  const clearCart = useCartStore((state) => state.clear);
+
+  const placeOrder = useMutation({
+    mutationFn: orderApi.place,
+    onSuccess: async (order) => {
+      clearCart();
+      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+      onPlaced(order);
+      window.scrollTo({ top: 0 });
+    },
+  });
+
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<ShippingAddress>({
+    resolver: zodResolver(shippingAddressSchema),
+    defaultValues: initialShipping(user),
+  });
+
+  const onSubmit = handleSubmit(async (shipping) => {
+    try {
+      await placeOrder.mutateAsync({ lines, shipping });
+    } catch (error) {
+      applyServerErrors(error, setError, 'shipping.');
+    }
+  });
+
+  return (
+    <form onSubmit={onSubmit} noValidate aria-label="Delivery details">
+      <h2 className="text-3xl">Delivery details</h2>
+      <div className="mt-6">
+        <FormAlert message={errors.root?.message} />
+      </div>
+
+      <div className="mt-6 grid gap-x-4 gap-y-5 sm:grid-cols-2">
+        {CHECKOUT_FIELDS.map((field) => (
+          <Field
+            key={field.name}
+            id={`checkout-${field.name}`}
+            label={field.label}
+            error={errors[field.name]?.message}
+            className={cn(field.span === 'full' && 'sm:col-span-2')}
+          >
+            {(control) => (
+              <input
+                {...control}
+                {...register(field.name)}
+                type={field.type}
+                autoComplete={field.autoComplete}
+                className={inputClass(!!errors[field.name], 'min-h-12')}
+              />
+            )}
+          </Field>
+        ))}
+      </div>
+
+      <div className="hairline mt-8 flex gap-3 rounded-xl border bg-ink-900 p-4 text-sm text-muted">
+        <Info size={18} className="mt-0.5 shrink-0 text-gold" aria-hidden />
+        <p>
+          Your order is saved and appears in your account, but no payment is taken yet. Connect a payment
+          provider before accepting real orders.
+        </p>
+      </div>
+
+      <Button type="submit" size="lg" fullWidth className="mt-6" disabled={isSubmitting}>
+        <Lock size={15} aria-hidden /> {isSubmitting ? 'Placing your order…' : `Place order · ${formatPrice(cart.total)}`}
+      </Button>
+    </form>
   );
 }
 
@@ -99,36 +196,27 @@ export function CheckoutPage() {
   usePageTitle('Checkout');
 
   const cart = useCart();
-  const clearCart = useCartStore((state) => state.clear);
-  const [values, setValues] = useState<CheckoutValues>(EMPTY_CHECKOUT_VALUES);
-  const [errors, setErrors] = useState<CheckoutErrors>({});
-  const [orderNumber, setOrderNumber] = useState<string>();
+  const { user, isLoading } = useSession();
+  const [placedOrder, setPlacedOrder] = useState<Order>();
 
-  if (orderNumber) return <Confirmation orderNumber={orderNumber} email={values.email} />;
-  if (cart.items.length === 0) return <EmptyCheckout />;
+  if (placedOrder) return <Confirmation order={placedOrder} />;
+  if (isLoading) return <PageLoader />;
 
-  const updateField = (name: CheckoutFieldName, value: string) => {
-    setValues((current) => ({ ...current, [name]: value }));
-    // Clear the error as soon as the shopper starts fixing it.
-    if (errors[name]) setErrors((current) => ({ ...current, [name]: undefined }));
-  };
+  if (cart.items.length === 0) {
+    return (
+      <CenteredMessage>
+        <div>
+          <h1 className="text-5xl md:text-6xl">Your bag is empty</h1>
+          <p className="mt-4 text-muted">Add a fragrance before checking out.</p>
+          <ButtonLink to="/shop" size="lg" className="mt-8">
+            Explore the collection
+          </ButtonLink>
+        </div>
+      </CenteredMessage>
+    );
+  }
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const nextErrors = validateCheckout(values);
-    setErrors(nextErrors);
-
-    const firstInvalid = CHECKOUT_FIELDS.find((field) => nextErrors[field.name]);
-    if (firstInvalid) {
-      document.getElementById(`checkout-${firstInvalid.name}`)?.focus();
-      return;
-    }
-
-    // Send the order to your backend / payment provider here.
-    setOrderNumber(createOrderNumber());
-    clearCart();
-    window.scrollTo({ top: 0 });
-  };
+  if (!user) return <SignInToCheckout />;
 
   return (
     <div className="container-page pb-24 pt-32 md:pt-40">
@@ -136,55 +224,7 @@ export function CheckoutPage() {
       <h1 className="mt-4 text-5xl md:text-7xl">Almost yours</h1>
 
       <div className="mt-12 grid gap-12 lg:grid-cols-[1.3fr_1fr] lg:gap-16">
-        <form onSubmit={handleSubmit} noValidate aria-label="Delivery details">
-          <h2 className="text-3xl">Delivery details</h2>
-
-          <div className="mt-6 grid gap-x-4 gap-y-5 sm:grid-cols-2">
-            {CHECKOUT_FIELDS.map((field) => {
-              const id = `checkout-${field.name}`;
-              const error = errors[field.name];
-              return (
-                <div key={field.name} className={cn(field.span === 'full' && 'sm:col-span-2')}>
-                  <label htmlFor={id} className="text-sm font-semibold">
-                    {field.label}
-                  </label>
-                  <input
-                    id={id}
-                    name={field.name}
-                    type={field.type}
-                    autoComplete={field.autoComplete}
-                    value={values[field.name]}
-                    onChange={(event) => updateField(field.name, event.target.value)}
-                    aria-invalid={error ? true : undefined}
-                    aria-describedby={error ? `${id}-error` : undefined}
-                    className={cn(
-                      'mt-2 min-h-12 w-full rounded-xl border bg-ink-900 px-4 text-base transition-colors focus:border-gold focus:outline-none',
-                      error ? 'border-danger' : 'border-cream/15',
-                    )}
-                  />
-                  {error && (
-                    <p id={`${id}-error`} className="mt-1.5 text-sm text-danger">
-                      {error}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="hairline mt-8 flex gap-3 rounded-xl border bg-ink-900 p-4 text-sm text-muted">
-            <Info size={18} className="mt-0.5 shrink-0 text-gold" aria-hidden />
-            <p>
-              This is a demo store: no payment is taken and no order is sent. Connect a payment
-              provider to start accepting real orders.
-            </p>
-          </div>
-
-          <Button type="submit" size="lg" fullWidth className="mt-6">
-            <Lock size={15} aria-hidden /> Place order · {formatPrice(cart.total)}
-          </Button>
-        </form>
-
+        <DeliveryForm user={user} cart={cart} onPlaced={setPlacedOrder} />
         <OrderSummary cart={cart} />
       </div>
     </div>

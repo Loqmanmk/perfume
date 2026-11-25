@@ -3,11 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { Button } from '@/components/ui/Button';
 import { SectionHeading } from '@/components/ui/SectionHeading';
+import { LoadError, ProductGridSkeleton } from '@/components/ui/Skeleton';
 import { FAMILY_LABELS, SCENT_FAMILIES, type ScentFamily } from '@/domain/product';
+import { useCatalogue } from '@/features/catalogue/useCatalogue';
 import { parseCatalogueQuery, queryCatalogue, SORT_OPTIONS } from '@/features/shop/catalogueQuery';
 import { cn } from '@/lib/cn';
 import { usePageTitle } from '@/lib/hooks/usePageTitle';
-import { productRepository } from '@/services/productRepository';
 
 interface FamilyChipProps {
   label: string;
@@ -38,7 +39,8 @@ export function ShopPage() {
 
   const [params, setParams] = useSearchParams();
   const query = parseCatalogueQuery(params);
-  const products = queryCatalogue(productRepository.getAll(), query);
+  const { repository, isLoading, error } = useCatalogue();
+  const products = queryCatalogue(repository.getAll(), query);
 
   /** Filters live in the URL so results can be shared, bookmarked and restored with Back. */
   const setParam = (key: string, value: string | undefined) => {
@@ -61,7 +63,7 @@ export function ShopPage() {
         as="h1"
         eyebrow="The collection"
         title="All fragrances"
-        description="Eight perfumes, each composed around a single idea. Filter by family or search for a note you love."
+        description="Each perfume is composed around a single idea. Filter by family or search for a note you love."
       />
 
       <div className="mt-12 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -118,10 +120,18 @@ export function ShopPage() {
       </div>
 
       <p className="mt-8 text-sm text-muted" role="status">
-        {products.length} {products.length === 1 ? 'fragrance' : 'fragrances'}
+        {isLoading ? 'Loading…' : `${products.length} ${products.length === 1 ? 'fragrance' : 'fragrances'}`}
       </p>
 
-      {products.length > 0 ? (
+      {error ? (
+        <div className="mt-8">
+          <LoadError message={error.message} />
+        </div>
+      ) : isLoading ? (
+        <div className="mt-8">
+          <ProductGridSkeleton count={8} />
+        </div>
+      ) : products.length > 0 ? (
         <div className="mt-8">
           <ProductGrid products={products} />
         </div>
