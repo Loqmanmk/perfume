@@ -1,4 +1,4 @@
-import { useMemo, useRef, type ReactNode, type RefObject } from 'react';
+import { Suspense, useMemo, useRef, type ReactNode, type RefObject } from 'react';
 import {
   ContactShadows,
   Environment,
@@ -11,6 +11,7 @@ import { useFrame } from '@react-three/fiber';
 import { CanvasTexture, MathUtils, type Group } from 'three';
 import type { BottleAppearance } from '@/domain/product';
 import { PerfumeBottle } from './PerfumeBottle';
+import { ScannedModel } from './ScannedModel';
 import type { BottleLabel } from './useLabelTexture';
 
 /** Mutable interaction state shared between the DOM wrapper and the render loop. */
@@ -23,6 +24,8 @@ export interface BottleInteraction {
 interface BottleSceneProps {
   bottle: BottleAppearance;
   label: BottleLabel;
+  /** A real 3D model of the product. When absent, the bottle is generated from `bottle`. */
+  modelUrl: string | null;
   interaction: RefObject<BottleInteraction>;
   autoRotate: boolean;
   animated: boolean;
@@ -116,7 +119,9 @@ function Turntable({
   );
 }
 
-export function BottleScene({ bottle, label, interaction, autoRotate, animated }: BottleSceneProps) {
+export function BottleScene({ bottle, label, modelUrl, interaction, autoRotate, animated }: BottleSceneProps) {
+  const generatedBottle = <PerfumeBottle bottle={bottle} label={label} />;
+
   return (
     <>
       <StudioEnvironment />
@@ -140,7 +145,14 @@ export function BottleScene({ bottle, label, interaction, autoRotate, animated }
           {/* Keyed so each fragrance gets a fresh entrance animation. */}
           <Turntable key={label.name} interaction={interaction} autoRotate={autoRotate}>
             <group position={[0, -0.35, 0]}>
-              <PerfumeBottle bottle={bottle} label={label} />
+              {modelUrl ? (
+                // The generated bottle stands in while the model downloads.
+                <Suspense fallback={generatedBottle}>
+                  <ScannedModel url={modelUrl} />
+                </Suspense>
+              ) : (
+                generatedBottle
+              )}
             </group>
           </Turntable>
         </Float>

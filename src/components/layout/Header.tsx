@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Heart, Menu, ShoppingBag, X } from 'lucide-react';
+import { Heart, LayoutDashboard, Menu, ShoppingBag, UserRound, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { NAV_LINKS, SITE } from '@/config/site';
+import { useSession } from '@/features/auth/useSession';
 import { useCart } from '@/features/cart/useCart';
 import { cn } from '@/lib/cn';
 import { useModalBehaviour } from '@/lib/hooks/useModalBehaviour';
@@ -39,7 +40,18 @@ function CountBadge({ count }: { count: number }) {
 const iconButtonClass =
   'relative grid size-11 place-items-center rounded-full text-cream transition-colors hover:text-gold';
 
-function MobileMenu({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+interface MenuLink {
+  to: string;
+  label: string;
+}
+
+interface MobileMenuProps {
+  isOpen: boolean;
+  onClose: () => void;
+  links: readonly MenuLink[];
+}
+
+function MobileMenu({ isOpen, onClose, links }: MobileMenuProps) {
   const panel = useRef<HTMLDivElement>(null);
   useModalBehaviour(isOpen, onClose, panel);
 
@@ -61,7 +73,7 @@ function MobileMenu({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
             <X size={22} aria-hidden />
           </button>
           <nav aria-label="Mobile" className="mt-10 flex flex-col gap-2">
-            {[...NAV_LINKS, { to: '/wishlist', label: 'Wishlist' }].map((link, index) => (
+            {links.map((link, index) => (
               <motion.div
                 key={link.to}
                 initial={{ opacity: 0, y: 18 }}
@@ -87,7 +99,16 @@ export function Header() {
   const { itemCount } = useCart();
   const wishlistCount = useWishlistStore((state) => state.productIds.length);
   const openCart = useUiStore((state) => state.openCart);
+  const { user, isAdmin } = useSession();
   const { pathname } = useLocation();
+
+  const accountLink: MenuLink = user ? { to: '/account', label: 'Account' } : { to: '/login', label: 'Sign in' };
+  const mobileLinks: MenuLink[] = [
+    ...NAV_LINKS,
+    { to: '/wishlist', label: 'Wishlist' },
+    accountLink,
+    ...(isAdmin ? [{ to: '/admin', label: 'Dashboard' }] : []),
+  ];
 
   useEffect(() => setIsMenuOpen(false), [pathname]);
 
@@ -130,6 +151,21 @@ export function Header() {
         </nav>
 
         <div className="flex items-center">
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className="mr-2 hidden min-h-11 items-center gap-2 rounded-full border border-gold/40 px-4 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-gold transition-colors hover:bg-gold hover:text-ink-950 md:flex"
+            >
+              <LayoutDashboard size={15} aria-hidden /> Dashboard
+            </Link>
+          )}
+          <Link
+            to={accountLink.to}
+            className={cn(iconButtonClass, 'hidden md:grid')}
+            aria-label={user ? `Your account, signed in as ${user.name}` : 'Sign in'}
+          >
+            <UserRound size={20} aria-hidden />
+          </Link>
           <Link
             to="/wishlist"
             className={cn(iconButtonClass, 'hidden md:grid')}
@@ -159,7 +195,7 @@ export function Header() {
         </div>
       </div>
 
-      <MobileMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+      <MobileMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} links={mobileLinks} />
     </header>
   );
 }

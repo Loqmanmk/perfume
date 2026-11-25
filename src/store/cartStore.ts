@@ -1,13 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { MAX_QUANTITY_PER_LINE } from '@/domain/order';
 
 export interface CartLine {
   productId: string;
   sizeMl: number;
   quantity: number;
 }
-
-export const MAX_QUANTITY_PER_LINE = 10;
 
 interface CartState {
   lines: CartLine[];

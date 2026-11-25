@@ -3,10 +3,11 @@ import { Check, ShoppingBag } from 'lucide-react';
 import { WishlistButton } from '@/components/product/WishlistButton';
 import { Button } from '@/components/ui/Button';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
+import { MAX_QUANTITY_PER_LINE } from '@/domain/order';
 import { defaultSize, findSize, type Product } from '@/domain/product';
 import { cn } from '@/lib/cn';
 import { formatPrice } from '@/lib/format';
-import { MAX_QUANTITY_PER_LINE, useCartStore } from '@/store/cartStore';
+import { useCartStore } from '@/store/cartStore';
 import { useUiStore } from '@/store/uiStore';
 
 const CONFIRMATION_MS = 1800;

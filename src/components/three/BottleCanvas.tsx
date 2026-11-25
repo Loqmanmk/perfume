@@ -10,6 +10,7 @@ import type { BottleLabel } from './useLabelTexture';
 export interface BottleCanvasProps {
   bottle: BottleAppearance;
   label: BottleLabel;
+  modelUrl?: string | null;
   autoRotate?: boolean;
   className?: string;
 }
@@ -20,7 +21,13 @@ const KEYBOARD_STEP = Math.PI / 8;
  * The WebGL viewer. Drag (or use ← →) to turn the bottle.
  * Heavy — import it through `BottleViewer`, which lazy-loads it and handles failure.
  */
-export default function BottleCanvas({ bottle, label, autoRotate = true, className }: BottleCanvasProps) {
+export default function BottleCanvas({
+  bottle,
+  label,
+  modelUrl = null,
+  autoRotate = true,
+  className,
+}: BottleCanvasProps) {
   const wrapper = useRef<HTMLDivElement>(null);
   const interaction = useRef<BottleInteraction>({ yaw: 0, isDragging: false });
   const isOnScreen = useIsOnScreen(wrapper);
@@ -50,7 +57,7 @@ export default function BottleCanvas({ bottle, label, autoRotate = true, classNa
       ref={wrapper}
       role="application"
       tabIndex={0}
-      aria-label={`Interactive 3D view of the ${label.name} bottle. Drag, or use the left and right arrow keys, to rotate.`}
+      aria-label={`360° view of ${label.name}. Drag, or use the left and right arrow keys, to turn it.`}
       className={cn('touch-pan-y select-none', className)}
       onKeyDown={handleKeyDown}
       onPointerDown={() => {
@@ -66,6 +73,7 @@ export default function BottleCanvas({ bottle, label, autoRotate = true, classNa
         <BottleScene
           bottle={bottle}
           label={label}
+          modelUrl={modelUrl}
           interaction={interaction}
           autoRotate={autoRotate && !prefersReducedMotion}
           animated={!prefersReducedMotion}

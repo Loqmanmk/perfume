@@ -2,7 +2,8 @@ import { ArrowRight } from 'lucide-react';
 import { ProductGrid } from '@/components/product/ProductGrid';
 import { ButtonLink } from '@/components/ui/Button';
 import { SectionHeading } from '@/components/ui/SectionHeading';
-import type { Product } from '@/domain/product';
+import { LoadError, ProductGridSkeleton, Skeleton } from '@/components/ui/Skeleton';
+import { useCatalogue } from '@/features/catalogue/useCatalogue';
 import { FamilyTiles } from '@/features/home/FamilyTiles';
 import { Hero } from '@/features/home/Hero';
 import { NotesMarquee } from '@/features/home/NotesMarquee';
@@ -10,7 +11,6 @@ import { ScentFinderBanner } from '@/features/home/ScentFinderBanner';
 import { ServicePromises } from '@/features/home/ServicePromises';
 import { Story } from '@/features/home/Story';
 import { usePageTitle } from '@/lib/hooks/usePageTitle';
-import { productRepository } from '@/services/productRepository';
 
 const HERO_PRODUCT_COUNT = 4;
 const FEATURED_PRODUCT_COUNT = 4;
@@ -18,16 +18,23 @@ const FEATURED_PRODUCT_COUNT = 4;
 export function HomePage() {
   usePageTitle();
 
-  const catalogue = productRepository.getAll();
+  const { repository, isLoading, error } = useCatalogue();
+  const catalogue = repository.getAll();
   const [firstHero, ...otherHeroes] = catalogue.slice(0, HERO_PRODUCT_COUNT);
-  const featured: readonly Product[] = [
-    ...productRepository.getBestsellers(),
-    ...catalogue.filter((product) => product.isNew),
+  const featured = [
+    ...new Set([...repository.getBestsellers(), ...catalogue.filter((product) => product.isNew)]),
   ].slice(0, FEATURED_PRODUCT_COUNT);
 
   return (
     <>
-      {firstHero && <Hero products={[firstHero, ...otherHeroes]} />}
+      {firstHero ? (
+        <Hero products={[firstHero, ...otherHeroes]} />
+      ) : (
+        <div className="container-page min-h-dvh pt-36">
+          {isLoading && <Skeleton className="h-[60dvh]" />}
+          {error && <LoadError message={error.message} />}
+        </div>
+      )}
       <NotesMarquee />
 
       <section className="container-page pt-24 md:pt-32" aria-label="Most loved fragrances">
@@ -42,7 +49,7 @@ export function HomePage() {
           </ButtonLink>
         </div>
         <div className="mt-14">
-          <ProductGrid products={featured} />
+          {isLoading ? <ProductGridSkeleton /> : !error && <ProductGrid products={featured} />}
         </div>
       </section>
 

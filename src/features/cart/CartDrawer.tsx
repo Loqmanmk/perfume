@@ -2,13 +2,14 @@ import { useEffect, useRef } from 'react';
 import { ShoppingBag, Trash2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Link, useLocation } from 'react-router-dom';
-import { BottleArt } from '@/components/product/BottleArt';
+import { ProductThumbnail } from '@/components/product/ProductThumbnail';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { QuantityStepper } from '@/components/ui/QuantityStepper';
 import { SITE } from '@/config/site';
 import { formatPrice } from '@/lib/format';
 import { useModalBehaviour } from '@/lib/hooks/useModalBehaviour';
-import { MAX_QUANTITY_PER_LINE, useCartStore } from '@/store/cartStore';
+import { MAX_QUANTITY_PER_LINE } from '@/domain/order';
+import { useCartStore } from '@/store/cartStore';
 import { useUiStore } from '@/store/uiStore';
 import { useCart, type CartItem } from './useCart';
 
@@ -55,10 +56,10 @@ function CartLineItem({ item, onNavigate }: { item: CartItem; onNavigate: () => 
       <Link
         to={`/product/${product.slug}`}
         onClick={onNavigate}
-        className="grid h-28 w-22 shrink-0 place-items-center rounded-xl bg-ink-800"
+        className="grid h-28 w-22 shrink-0 place-items-center overflow-hidden rounded-xl bg-ink-800 p-1"
         aria-label={product.name}
       >
-        <BottleArt bottle={product.bottle} name="" className="h-24" />
+        <ProductThumbnail product={product} className="rounded-lg" />
       </Link>
 
       <div className="flex min-w-0 flex-1 flex-col">

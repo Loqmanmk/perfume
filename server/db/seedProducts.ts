@@ -1,10 +1,12 @@
-import type { Product } from '@/domain/product';
+import type { Product } from '../../src/domain/product.ts';
 
 /**
- * Sample catalogue. Replace with your real fragrances —
- * the rest of the app only talks to `ProductRepository`.
+ * Sample catalogue inserted the first time the database is created.
+ * After that, products are managed from the admin dashboard.
  */
-export const PRODUCTS: readonly Product[] = [
+export type SeedProduct = Omit<Product, 'images' | 'modelUrl'>;
+
+export const SEED_PRODUCTS: readonly SeedProduct[] = [
   {
     id: 'p-001',
     slug: 'ambre-nocturne',

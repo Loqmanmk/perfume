@@ -1,15 +1,17 @@
-import { ChevronDown, Rotate3d } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { ProductGrid } from '@/components/product/ProductGrid';
-import { BottleViewer } from '@/components/three/BottleViewer';
 import { Rating } from '@/components/ui/Rating';
 import { ScaleMeter } from '@/components/ui/ScaleMeter';
 import { SectionHeading } from '@/components/ui/SectionHeading';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { FAMILY_LABELS, type Product } from '@/domain/product';
+import { useCatalogue } from '@/features/catalogue/useCatalogue';
 import { NotesPyramid } from '@/features/product/NotesPyramid';
+import { ProductMedia } from '@/features/product/ProductMedia';
 import { PurchasePanel } from '@/features/product/PurchasePanel';
 import { usePageTitle } from '@/lib/hooks/usePageTitle';
-import { productRepository } from '@/services/productRepository';
+import type { ProductRepository } from '@/services/productRepository';
 import { NotFoundPage } from './NotFoundPage';
 
 const RELATED_COUNT = 4;
@@ -53,9 +55,9 @@ function Breadcrumb({ product }: { product: Product }) {
   );
 }
 
-function ProductDetail({ product }: { product: Product }) {
+function ProductDetail({ product, catalogue }: { product: Product; catalogue: ProductRepository }) {
   usePageTitle(product.name);
-  const related = productRepository.getRelated(product, RELATED_COUNT);
+  const related = catalogue.getRelated(product, RELATED_COUNT);
 
   return (
     <div className="pt-28 md:pt-36">
@@ -64,23 +66,7 @@ function ProductDetail({ product }: { product: Product }) {
 
         <div className="mt-6 grid gap-10 lg:grid-cols-2 lg:gap-16">
           <div className="lg:sticky lg:top-24 lg:self-start">
-            <div className="hairline relative isolate overflow-hidden rounded-3xl border bg-ink-900">
-              <div
-                aria-hidden
-                className="absolute inset-0 -z-10 opacity-40"
-                style={{
-                  background: `radial-gradient(circle at 50% 55%, ${product.bottle.liquidColor}, transparent 65%)`,
-                }}
-              />
-              <BottleViewer
-                bottle={product.bottle}
-                label={{ name: product.name, caption: product.concentration }}
-                className="h-[26rem] w-full sm:h-[34rem] lg:h-[40rem]"
-              />
-              <p className="pointer-events-none absolute inset-x-0 bottom-5 flex items-center justify-center gap-2 text-[0.68rem] uppercase tracking-[0.22em] text-muted">
-                <Rotate3d size={15} aria-hidden /> Drag to rotate
-              </p>
-            </div>
+            <ProductMedia key={product.id} product={product} />
           </div>
 
           <div className="pb-4">
@@ -89,9 +75,11 @@ function ProductDetail({ product }: { product: Product }) {
             </p>
             <h1 className="mt-4 text-5xl md:text-7xl">{product.name}</h1>
             <p className="mt-3 font-display text-2xl italic text-cream/80">{product.tagline}</p>
-            <div className="mt-4">
-              <Rating value={product.rating} reviewCount={product.reviewCount} />
-            </div>
+            {product.reviewCount > 0 && (
+              <div className="mt-4">
+                <Rating value={product.rating} reviewCount={product.reviewCount} />
+              </div>
+            )}
 
             <p className="mt-6 text-muted">{product.description}</p>
 
@@ -146,9 +134,24 @@ function ProductDetail({ product }: { product: Product }) {
   );
 }
 
+function ProductSkeleton() {
+  return (
+    <div className="container-page grid gap-10 pt-36 lg:grid-cols-2 lg:gap-16" role="status" aria-label="Loading">
+      <Skeleton className="h-[26rem] lg:h-[40rem]" />
+      <div className="space-y-5">
+        <Skeleton className="h-4 w-40 rounded-full" />
+        <Skeleton className="h-16 w-3/4" />
+        <Skeleton className="h-24" />
+      </div>
+    </div>
+  );
+}
+
 export function ProductPage() {
   const { slug = '' } = useParams();
-  const product = productRepository.getBySlug(slug);
+  const { repository, isLoading } = useCatalogue();
+  const product = repository.getBySlug(slug);
 
-  return product ? <ProductDetail product={product} /> : <NotFoundPage />;
+  if (product) return <ProductDetail product={product} catalogue={repository} />;
+  return isLoading ? <ProductSkeleton /> : <NotFoundPage />;
 }
